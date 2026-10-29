@@ -15,6 +15,8 @@ The independent editor run passes at 360×640, 768×1024, 800×800 and 2560×108
 
 The CPU build guard accepts the saved CPU scene, rejects a non-web target and a saved Compute solver, preserves compute variants outside its explicit scope, strips the intended Obi compute variants within scope, and leaves an unrelated compute shader alone.
 
+The runtime-prefab extension accepts a solver-free scene with an explicitly declared CPU prefab containing an inactive solver. It rejects missing declarations, inactive nested Compute solvers, solver-free prefabs, nulls, scene instances and prefab child objects. Rejected builds preserve the existing graphics selection and shader-strip scope.
+
 The verification runner rejects overlapping package, Obi-source and consumer directories before writing. Each run archives prior reports and requires new PASS/Succeeded result files, so old screenshots or success messages cannot stand in for a failed run.
 
 
@@ -24,4 +26,4 @@ The independent URP WebGL2 development build succeeds with zero reported build e
 
 The standalone browser test passes 12 grabs, including 360×640, 768×1024, 800×800 and 2560×1080 viewport checks. The canvas fills each viewport and the sphere remains interactive. The desktop run reports approximately 16.6 ms per dragging frame, with 81 finite particles, two fixed pins and no browser warnings/errors. These are whole-player, vsync-influenced frame times. They do not establish physical phone performance.
 
-Version 0.1.0 validates serialized scene solvers and requires at least one such solver. Runtime-only solver spawning is rejected until a declared-prefab validation API is added. The sample's fixed corners are blueprint inverse-mass pins; there is no authored hand attachment or car contact adapter in this package.
+Version 0.1.1 supports explicitly declared runtime solver prefabs as well as serialized scene solvers. Undeclared dynamically loaded solvers remain the consumer's responsibility. The sample's fixed corners are blueprint inverse-mass pins; there is no authored hand attachment or car contact adapter in this package.

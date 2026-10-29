@@ -79,7 +79,7 @@ namespace WebCloth.Validation
             InputSystem.settings.editorInputBehaviorInPlayMode = originalInput;
             InputSystem.settings.backgroundBehavior = originalBackground;
             Directory.CreateDirectory("Reports");
-            File.WriteAllText("Reports/play.txt", error == null ? "PASS: independent sample; CPU build guard; 81 finite particles and two fixed pins before and after interaction; visible mouse/touch movement, off-center edge grabs, final release and resize cancellation at phone, tablet, square and ultrawide sizes." : "FAIL: " + error);
+            File.WriteAllText("Reports/play.txt", error == null ? "PASS: independent sample; CPU scene/runtime-prefab build guard and rejected-build setting preservation; 81 finite particles and two fixed pins before and after interaction; visible mouse/touch movement, off-center edge grabs, final release and resize cancellation at phone, tablet, square and ultrawide sizes." : "FAIL: " + error);
             SessionState.SetInt(Key + ".exit", error == null ? 0 : 1);
             if (EditorApplication.isPlaying) { GameView.Restore(); EditorApplication.isPlaying = false; }
             else { SessionState.SetBool(Key, false); EditorApplication.Exit(error == null ? 0 : 1); }
@@ -166,6 +166,7 @@ namespace WebCloth.Validation
             options.target = BuildTarget.StandaloneOSX;
             try { CpuWebClothBuild.Validate(options); throw new Exception("Non-web build was accepted."); }
             catch (ArgumentException) { }
+            options.target = BuildTarget.WebGL;
             var gpu = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
             try
             {
@@ -177,6 +178,7 @@ namespace WebCloth.Validation
                 catch (InvalidOperationException) { }
             }
             finally { EditorSceneManager.CloseScene(gpu, true); AssetDatabase.DeleteAsset("Assets/Rejected GPU.unity"); }
+            ValidateRuntimePrefabs(options);
             var shader = AssetDatabase.LoadAssetAtPath<ComputeShader>("Assets/Obi/Resources/Compute/FluidFoamCollisions.compute");
             if (shader == null) throw new InvalidOperationException("Expected Obi compute shader not found for guard test.");
             var data = new List<ShaderCompilerData> { default };
@@ -194,6 +196,71 @@ namespace WebCloth.Validation
                 if (data.Count != 1) throw new InvalidOperationException("CPU build stripped another compute shader.");
             }
             finally { SessionState.EraseString(key); }
+        }
+
+        private static void ValidateRuntimePrefabs(BuildPlayerOptions sampleOptions)
+        {
+            const string folder = "Assets/Runtime Solver Validation";
+            const string scopeKey = "WebCloth.CpuBuild.ComputeFolder";
+            AssetDatabase.CreateFolder("Assets", "Runtime Solver Validation");
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+            var root = new GameObject("Runtime CPU cloth");
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(root, scene);
+            var solverObject = new GameObject("Inactive nested CPU solver");
+            solverObject.transform.SetParent(root.transform);
+            solverObject.AddComponent<ObiSolver>().backendType = ObiSolver.BackendType.Burst;
+            solverObject.SetActive(false);
+            var cpu = PrefabUtility.SaveAsPrefabAsset(root, folder + "/CPU.prefab");
+            var gpuObject = new GameObject("Inactive nested Compute solver");
+            gpuObject.transform.SetParent(solverObject.transform);
+            gpuObject.AddComponent<ObiSolver>().backendType = ObiSolver.BackendType.Compute;
+            var gpu = PrefabUtility.SaveAsPrefabAsset(root, folder + "/Compute.prefab");
+            UnityEngine.Object.DestroyImmediate(root);
+            root = new GameObject("Empty prefab");
+            UnityEngine.SceneManagement.SceneManager.MoveGameObjectToScene(root, scene);
+            var empty = PrefabUtility.SaveAsPrefabAsset(root, folder + "/Empty.prefab");
+            UnityEngine.Object.DestroyImmediate(root);
+            EditorSceneManager.SaveScene(scene, folder + "/Runtime.unity");
+            var options = new BuildPlayerOptions { scenes = new[] { folder + "/Runtime.unity" }, target = BuildTarget.WebGL };
+            var previousScope = SessionState.GetString(scopeKey, string.Empty);
+            var automatic = PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.WebGL);
+            var graphics = PlayerSettings.GetGraphicsAPIs(BuildTarget.WebGL);
+            GameObject? instance = null;
+            try
+            {
+                CpuWebClothBuild.Validate(options, new[] { cpu });
+                RequireRejected<InvalidOperationException>(() => CpuWebClothBuild.Validate(options), "Runtime-only scene without declared solvers");
+                RequireRejected<InvalidOperationException>(() => CpuWebClothBuild.Validate(options, Array.Empty<GameObject>()), "Empty runtime declarations");
+                RequireRejected<InvalidOperationException>(() => CpuWebClothBuild.Validate(sampleOptions, new[] { gpu }), "Inactive nested Compute prefab solver");
+                RequireRejected<InvalidOperationException>(() => CpuWebClothBuild.Validate(sampleOptions, new[] { empty }), "Solver-free prefab declaration");
+                RequireRejected<ArgumentNullException>(() => CpuWebClothBuild.Validate(options, null!), "Null declaration list");
+                RequireRejected<ArgumentException>(() => CpuWebClothBuild.Validate(options, new GameObject[] { null! }), "Null declaration");
+                RequireRejected<ArgumentException>(() => CpuWebClothBuild.Validate(options, new[] { cpu.transform.GetChild(0).gameObject }), "Prefab child declaration");
+                instance = (GameObject)PrefabUtility.InstantiatePrefab(cpu, scene);
+                RequireRejected<ArgumentException>(() => CpuWebClothBuild.Validate(options, new[] { instance! }), "Scene prefab instance declaration");
+                SessionState.SetString(scopeKey, "Existing validation scope");
+                RequireRejected<InvalidOperationException>(() => CpuWebClothBuild.Build(options, new[] { gpu }), "Rejected runtime build");
+                if (SessionState.GetString(scopeKey, string.Empty) != "Existing validation scope" || PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.WebGL) != automatic)
+                    throw new InvalidOperationException("Rejected runtime build changed the existing build scope or graphics selection.");
+                var afterGraphics = PlayerSettings.GetGraphicsAPIs(BuildTarget.WebGL);
+                if (afterGraphics.Length != graphics.Length) throw new InvalidOperationException("Rejected runtime build changed graphics APIs.");
+                for (var i = 0; i < graphics.Length; i++)
+                    if (afterGraphics[i] != graphics[i]) throw new InvalidOperationException("Rejected runtime build changed graphics APIs.");
+            }
+            finally
+            {
+                SessionState.SetString(scopeKey, previousScope);
+                if (instance != null) UnityEngine.Object.DestroyImmediate(instance);
+                EditorSceneManager.CloseScene(scene, true);
+                AssetDatabase.DeleteAsset(folder);
+            }
+        }
+
+        private static void RequireRejected<T>(Action action, string description) where T : Exception
+        {
+            try { action(); }
+            catch (T) { return; }
+            throw new InvalidOperationException(description + " was accepted.");
         }
         private static IEnumerator VerifyDragging(ObiCloth cloth)
         {

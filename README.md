@@ -2,7 +2,7 @@
 
 A small Unity package for reusing the tested Obi CPU cloth effect in WebGL2 projects. It contains bounded mouse/touch sphere dragging, an explicit CPU WebGL builder, and an optional interaction sample with browser frame measurements.
 
-Obi Cloth is a separate prerequisite. Its source, shaders and other vendor assets are not distributed by this repository. Version 0.1.0 is a private local package; no remote repository is configured.
+Obi Cloth is a separate prerequisite. Its source, shaders and other vendor assets are not distributed by this repository. This is a private local package; no remote repository is configured.
 
 ## Install
 
@@ -39,7 +39,9 @@ var report = WebCloth.Editor.CpuWebClothBuild.Build(new UnityEditor.BuildPlayerO
 });
 ```
 
-Use this entry point only for a build in which **every Obi solver uses the CPU backend**, including solvers instantiated from prefabs, Resources or Addressables later. Preflight checks serialized solvers in the selected scenes, including inactive objects. It cannot inspect future runtime-created solvers. Version 0.1.0 also requires at least one solver serialized in the selected scenes; projects that spawn every solver from runtime prefabs are rejected. Supporting them requires an additional declared-prefab validation API, outside this initial version. Compute-based Obi effects cannot work in this build because their compute variants are removed.
+For solvers created from prefabs at runtime, pass every solver prefab explicitly as the second argument to `Build(options, runtimeSolverPrefabs)` or `Validate(options, runtimeSolverPrefabs)`. The list accepts saved root prefab assets and checks all their solvers, including inactive children and nested prefab contents. A selected scene can contain no solver if the declared prefabs provide one. Nulls, scene instances, child objects, solver-free declarations and Compute solvers are rejected. The original one-argument overloads remain available for scene-only builds.
+
+Use this entry point only for a build in which **every Obi solver uses the CPU backend**, including solvers instantiated from prefabs, Resources or Addressables later. Preflight checks serialized solvers in the selected scenes and declared prefabs, including inactive objects. It does not discover undeclared Resources/Addressables prefabs or solvers constructed in code. Compute-based Obi effects cannot work in this build because their compute variants are removed.
 
 The wrapper temporarily selects OpenGLES3/WebGL2, then restores graphics settings and shader-strip scope in `finally`. It does not edit Obi files. The sample's build command temporarily uses Unity's default template and disables compression for a simple local HTTP server, restoring both settings afterward. Its generated HTML gets a small CSS override so the test canvas fills the window while resizing; the generic build wrapper leaves your own template alone.
 

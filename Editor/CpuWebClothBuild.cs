@@ -2,6 +2,7 @@
 namespace WebCloth.Editor
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
     using Obi;
     using UnityEditor;
@@ -14,9 +15,11 @@ namespace WebCloth.Editor
     {
         internal const string ComputeFolderKey = "WebCloth.CpuBuild.ComputeFolder";
 
-        public static BuildReport Build(BuildPlayerOptions options)
+        public static BuildReport Build(BuildPlayerOptions options) => Build(options, Array.Empty<GameObject>());
+
+        public static BuildReport Build(BuildPlayerOptions options, IReadOnlyList<GameObject> runtimeSolverPrefabs)
         {
-            Validate(options);
+            Validate(options, runtimeSolverPrefabs);
             var computeFolder = FindComputeFolder();
             var previousScope = SessionState.GetString(ComputeFolderKey, string.Empty);
             var automatic = PlayerSettings.GetUseDefaultGraphicsAPIs(BuildTarget.WebGL);
@@ -36,10 +39,13 @@ namespace WebCloth.Editor
             }
         }
 
-        public static void Validate(BuildPlayerOptions options)
+        public static void Validate(BuildPlayerOptions options) => Validate(options, Array.Empty<GameObject>());
+
+        public static void Validate(BuildPlayerOptions options, IReadOnlyList<GameObject> runtimeSolverPrefabs)
         {
             if (options.target != BuildTarget.WebGL) throw new ArgumentException("CPU cloth web builds require the WebGL target.", nameof(options));
             if (options.scenes == null || options.scenes.Length == 0) throw new ArgumentException("Select at least one saved scene.", nameof(options));
+            if (runtimeSolverPrefabs == null) throw new ArgumentNullException(nameof(runtimeSolverPrefabs));
             var count = 0;
             foreach (var path in options.scenes)
             {
@@ -48,16 +54,29 @@ namespace WebCloth.Editor
                 try
                 {
                     foreach (var root in scene.GetRootGameObjects())
-                    foreach (var solver in root.GetComponentsInChildren<ObiSolver>(true))
-                    {
-                        count++;
-                        if (solver.backendType != ObiSolver.BackendType.Burst)
-                            throw new InvalidOperationException("CPU web builds cannot contain Compute solvers: " + solver.name + " in " + path);
-                    }
+                        count += ValidateSolvers(root, path);
                 }
                 finally { EditorSceneManager.ClosePreviewScene(scene); }
             }
-            if (count == 0) throw new InvalidOperationException("No Obi solver was found in the selected scenes.");
+            foreach (var prefab in runtimeSolverPrefabs)
+            {
+                if (prefab == null || !AssetDatabase.IsMainAsset(prefab) || !PrefabUtility.IsPartOfPrefabAsset(prefab))
+                    throw new ArgumentException("Declare saved root prefab assets for runtime solvers.", nameof(runtimeSolverPrefabs));
+                var path = AssetDatabase.GetAssetPath(prefab);
+                var prefabCount = ValidateSolvers(prefab, path);
+                if (prefabCount == 0) throw new InvalidOperationException("The declared runtime prefab contains no Obi solver: " + path);
+                count += prefabCount;
+            }
+            if (count == 0) throw new InvalidOperationException("No Obi solver was found in the selected scenes or declared runtime prefabs.");
+        }
+
+        private static int ValidateSolvers(GameObject root, string source)
+        {
+            var solvers = root.GetComponentsInChildren<ObiSolver>(true);
+            foreach (var solver in solvers)
+                if (solver.backendType != ObiSolver.BackendType.Burst)
+                    throw new InvalidOperationException("CPU web builds cannot contain Compute solvers: " + solver.name + " in " + source);
+            return solvers.Length;
         }
 
         private static string FindComputeFolder()

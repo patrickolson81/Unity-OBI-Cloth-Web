@@ -1,6 +1,6 @@
 {
   "name": "com.patrickolson.web-cloth",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "displayName": "Unity Web Cloth",
   "description": "CPU cloth WebGL build support, sphere dragging, and an optional Obi cloth interaction sample. Requires a separately installed Obi Cloth 7.2.",
   "unity": "6000.3",
