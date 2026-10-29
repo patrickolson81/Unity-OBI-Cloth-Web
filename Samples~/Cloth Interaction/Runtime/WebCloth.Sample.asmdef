@@ -1,0 +1,10 @@
+{
+  "name": "WebCloth.Sample",
+  "rootNamespace": "WebCloth",
+  "references": [
+    "WebCloth",
+    "Obi"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}

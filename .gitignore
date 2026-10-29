@@ -1,0 +1,15 @@
+ValidationProject~/
+Builds~/
+Reports~/
+.DS_Store
+*.csproj
+*.sln
+
+!Samples~/
+!Samples~/**
+!Documentation~/
+!Documentation~/**
+!Tools~/
+!Tools~/**
+__pycache__/
+*.pyc

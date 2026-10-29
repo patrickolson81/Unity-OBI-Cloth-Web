@@ -1,0 +1,18 @@
+{
+  "name": "WebCloth.Validation",
+  "rootNamespace": "WebCloth",
+  "references": [
+    "WebCloth",
+    "WebCloth.Editor",
+    "WebCloth.Sample",
+    "WebCloth.Sample.Editor",
+    "Obi",
+    "Unity.InputSystem",
+    "WebCloth.Validation.Host",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

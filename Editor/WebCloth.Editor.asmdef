@@ -1,0 +1,11 @@
+{
+  "name": "WebCloth.Editor",
+  "rootNamespace": "WebCloth",
+  "references": [
+    "Obi"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "autoReferenced": true
+}

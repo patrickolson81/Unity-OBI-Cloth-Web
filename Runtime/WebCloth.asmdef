@@ -1,0 +1,9 @@
+{
+  "name": "WebCloth",
+  "rootNamespace": "WebCloth",
+  "references": [
+    "Unity.InputSystem"
+  ],
+  "includePlatforms": [],
+  "autoReferenced": true
+}
